@@ -163,31 +163,35 @@ class ContentExtractionAgent:
             if lang.startswith("he") else
             "All textual fields should be in natural, fluent English."
         )
+        target = settings.max_clip_duration
+        # Provide a small flexible window around target (e.g., 15 -> 14-16s)
+        lower = max(5, target - 1)
+        upper = target + 1 if target < 120 else target
         return f"""
-        Extract teaser content from this podcast script for a {settings.max_clip_duration}-second social media clip.
+Extract teaser content from this podcast script for a {target}-second social media clip.
 
-        {language_instruction}
+{language_instruction}
 
-        PODCAST TITLE: {script.title}
+PODCAST TITLE: {script.title}
 
-        SCRIPT CONTENT:
-        {script.content[:2000]}
+SCRIPT CONTENT:
+{script.content[:2000]}
 
-        Please provide:
-        1. HEADLINE: A catchy, attention-grabbing headline (max 10 words)
-        2. SCRIPT: A 15-20 second narration script that hooks viewers
-        3. KEY_POINTS: 3-5 bullet points of the most interesting content
-        4. VISUAL_DESCRIPTION: Description for video generation (what should be shown)
+Please provide:
+1. HEADLINE: A catchy, attention-grabbing headline (max 10 words)
+2. SCRIPT: A {lower}-{upper} second narration script that hooks viewers (stay within this window)
+3. KEY_POINTS: 3-5 bullet points of the most interesting content
+4. VISUAL_DESCRIPTION: Description for video generation (what should be shown)
 
-        Format your response as JSON:
-        {{
-            "headline": "Your catchy headline here",
-            "script": "Your 15-20 second script here",
-            "key_points": ["Point 1", "Point 2", "Point 3"],
-            "visual_description": "Description of visuals for video generation",
-            "duration_seconds": {settings.max_clip_duration}
-        }}
-        """
+Format your response as JSON:
+{{
+    "headline": "Your catchy headline here",
+    "script": "Your {lower}-{upper} second script here",
+    "key_points": ["Point 1", "Point 2", "Point 3"],
+    "visual_description": "Description of visuals for video generation",
+    "duration_seconds": {settings.max_clip_duration}
+}}
+"""
     
     def _parse_response(self, content: str) -> TeaserContent:
         """Parse the AI response into TeaserContent model."""
