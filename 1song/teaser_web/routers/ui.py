@@ -31,7 +31,11 @@ async def index(request: Request):
             "request": request,
             "defaults": {
                 "title": "Demo Episode",
-                "prompt": "Short description of the episode topic",
+                "prompt": (
+                    "Create a punchy 15s teaser for a podcast episode where we decode the hidden meaning behind a beloved song. "
+                    "Include: 1 surprising lyric insight, 1 emotional angle listeners usually miss, and end with a curiosity hook question. "
+                    "Tone: curious, energetic, inviting. Audience: music fans 18–35 who love storytelling in music."
+                ),
                 "headline": "Catchy Headline Here",
                 "duration": 15,
                 "voice_name": settings.azure_speech_voice or "en-US-JennyNeural",
