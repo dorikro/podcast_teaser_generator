@@ -71,6 +71,9 @@
         </fieldset>
         <!-- Removed separate Script field; XML prompt now primary source -->
         <div class="actions">
+          <label style="display:inline-flex;align-items:center;gap:4px;font-weight:normal">
+            <input type="checkbox" name="force" value="true" /> Force regenerate
+          </label>
           <button type="button" data-mode="audio" class="primary">Generate Audio Only</button>
           <button type="button" data-mode="full" class="secondary">Generate Audio + Video</button>
         </div>
@@ -131,8 +134,9 @@
       const userEdited = raw && raw.dataset.edited === 'true';
       const prompt = userEdited ? raw.value : buildXmlPrompt(fd);
       if(raw && !userEdited){ raw.value = prompt; }
-      const entries = [...fd.entries()].filter(([k]) => !['surprising_insight','emotional_angle','curiosity_hook','song_title','artist','tone_field','audience_field','output_desc'].includes(k));
-      return Object.fromEntries([...entries, ['prompt', prompt], ['mode', mode]]);
+  const entries = [...fd.entries()].filter(([k]) => !['surprising_insight','emotional_angle','curiosity_hook','song_title','artist','tone_field','audience_field','output_desc'].includes(k));
+  const force = fd.get('force') === 'true';
+  return Object.fromEntries([...entries, ['prompt', prompt], ['mode', mode], ['force', force]]);
     }
 
     const rawPrompt = document.getElementById('rawPrompt');
@@ -168,7 +172,12 @@
       pidEl.textContent = data.project_id;
       const projectId = data.project_id;
       // Always set audio if present
-      if(data.audio_url){
+  // Reset players
+  audioPlayer.removeAttribute('src');
+  videoPlayer.removeAttribute('src');
+  finalPlayer.removeAttribute('src');
+  videoBlock.hidden = true; finalBlock.hidden = true;
+  if(data.audio_url){
         const bust = data.audio_url + '?v=' + Date.now();
         audioLink.href = bust;
         audioPlayer.src = bust;

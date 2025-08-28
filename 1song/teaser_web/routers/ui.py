@@ -42,6 +42,7 @@ class GenerationRequest(BaseModel):
     gender: str | None = None
     voice_name: str | None = None  # e.g. en-US-JennyNeural
     mode: str = "audio"  # audio or full
+    force: bool = False  # force regenerate all artifacts
 
 @router.get("/", response_class=HTMLResponse)
 async def index(request: Request):
@@ -135,9 +136,9 @@ async def api_generate(data: GenerationRequest):
         language=language,
         voice_gender=inferred_gender,
         voice_name=voice,
-        force=False,
+        force=data.force,
     )
-    _, audio_path = await workflow.step_tts(script_model, language=language, force=False)
+    _, audio_path = await workflow.step_tts(script_model, language=language, force=data.force)
     audio_url = _fs_to_web_path(audio_path)
 
     # If only audio requested, return immediately.
@@ -156,8 +157,8 @@ async def api_generate(data: GenerationRequest):
     # For full mode, schedule video + compose in background if not already done
     async def run_video_and_compose():
         try:
-            await workflow.step_video(script_model, force=False)
-            await workflow.step_compose(script_model, language=language, force=False)
+            await workflow.step_video(script_model, force=data.force)
+            await workflow.step_compose(script_model, language=language, force=data.force)
         except Exception as e:
             # Log; status endpoint will reflect presence/absence of files
             from loguru import logger as _log
