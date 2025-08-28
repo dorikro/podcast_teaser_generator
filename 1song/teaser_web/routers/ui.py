@@ -17,9 +17,10 @@ class GenerationRequest(BaseModel):
     script: str | None = None
     headline: str | None = None
     duration: int = 15
-    language: str = "en-US"
+    # Deprecated individual fields (language, gender) now inferred from voice_name; kept for backward compat
+    language: str | None = None
     gender: str | None = None
-    voice_name: str | None = None
+    voice_name: str | None = None  # e.g. en-US-JennyNeural
     mode: str = "audio"  # audio or full
 
 @router.get("/", response_class=HTMLResponse)
@@ -33,8 +34,7 @@ async def index(request: Request):
                 "prompt": "Short description of the episode topic",
                 "headline": "Catchy Headline Here",
                 "duration": 15,
-                "language": settings.azure_speech_language or "en-US",
-                "gender": "auto",
+                "voice_name": settings.azure_speech_voice or "en-US-JennyNeural",
             },
         },
     )
@@ -42,29 +42,44 @@ async def index(request: Request):
 @router.post("/api/generate", response_class=JSONResponse)
 async def api_generate(data: GenerationRequest):
     workflow = TeaserGenerationWorkflow()
+
+    # Derive language & gender from voice_name (single dropdown parameter)
+    voice = data.voice_name or settings.azure_speech_voice or "en-US-JennyNeural"
+    # Language is first two hyphen-separated parts (e.g. en-US, he-IL)
+    parts = voice.split("-")
+    language = "-".join(parts[0:2]) if len(parts) >= 2 else (data.language or settings.azure_speech_language or "en-US")
+    gender_map = {
+        "en-US-JennyNeural": "female",
+        "en-US-SaraNeural": "female",
+        "en-US-GuyNeural": "male",
+        "he-IL-HilaNeural": "female",
+        "he-IL-AvriNeural": "male",
+    }
+    inferred_gender = gender_map.get(voice)
+
     # Build script model for stable ID and subsequent steps
     content_text = data.script or data.prompt or ""
     script_model = PodcastScript(title=data.title, content=content_text)
 
-    # Step 1: teaser content + audio
+    # Step 1: teaser content + audio (stores voice metadata)
     pid, _ = await workflow.step_generate_from_input(
         title=data.title,
         prompt=data.prompt,
         full_script=data.script,
         headline=data.headline,
         target_duration=data.duration,
-        language=data.language,
-        voice_gender=None if data.gender == "auto" else data.gender,
-        voice_name=data.voice_name,
+        language=language,
+        voice_gender=inferred_gender,
+        voice_name=voice,
         force=False,
     )
-    _, audio_path = await workflow.step_tts(script_model, language=data.language, force=False)
+    _, audio_path = await workflow.step_tts(script_model, language=language, force=False)
 
     video_path = None
     final_path = None
     if data.mode == "full":
         _, video_path = await workflow.step_video(script_model, force=False)
-        _, final_path = await workflow.step_compose(script_model, language=data.language, force=False)
+        _, final_path = await workflow.step_compose(script_model, language=language, force=False)
 
     return {
         "project_id": pid,

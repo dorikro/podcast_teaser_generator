@@ -24,21 +24,15 @@
           <label>Duration (s)
             <input type="number" name="duration" value="{{ defaults.duration }}" min="5" max="120" />
           </label>
-          <label>Language
-            <select name="language">
-              <option value="en-US" {% if defaults.language.startswith('en') %}selected{% endif %}>English (en-US)</option>
-              <option value="he-IL" {% if defaults.language.startswith('he') %}selected{% endif %}>Hebrew (he-IL)</option>
-            </select>
-          </label>
-          <label>Gender
-            <select name="gender">
-              <option value="auto" {% if defaults.gender=='auto' %}selected{% endif %}>Auto</option>
-              <option value="female">Female</option>
-              <option value="male">Male</option>
-            </select>
-          </label>
           <label>Voice Name
-            <input name="voice_name" placeholder="Optional explicit voice" />
+            <select name="voice_name">
+              {% set v = defaults.voice_name %}
+              <option value="en-US-JennyNeural" {% if v=='en-US-JennyNeural' %}selected{% endif %}>en-US-JennyNeural (EN Female)</option>
+              <option value="en-US-GuyNeural" {% if v=='en-US-GuyNeural' %}selected{% endif %}>en-US-GuyNeural (EN Male)</option>
+              <option value="en-US-SaraNeural" {% if v=='en-US-SaraNeural' %}selected{% endif %}>en-US-SaraNeural (EN Female)</option>
+              <option value="he-IL-HilaNeural" {% if v=='he-IL-HilaNeural' %}selected{% endif %}>he-IL-HilaNeural (HE Female)</option>
+              <option value="he-IL-AvriNeural" {% if v=='he-IL-AvriNeural' %}selected{% endif %}>he-IL-AvriNeural (HE Male)</option>
+            </select>
           </label>
         </div>
         <label>Prompt (alternative to Script)
