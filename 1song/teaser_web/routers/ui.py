@@ -66,6 +66,12 @@ async def api_generate(data: GenerationRequest):
     script_model = PodcastScript(title=data.title, content=content_text)
 
     # Step 1: teaser content + audio (stores voice metadata)
+    # Ensure global settings reflects language so prompt generation outputs correct language
+    try:
+        from podcast_teaser_generator.config import settings as global_settings
+        global_settings.azure_speech_language = language
+    except Exception:
+        pass
     pid, _ = await workflow.step_generate_from_input(
         title=data.title,
         prompt=data.prompt,
