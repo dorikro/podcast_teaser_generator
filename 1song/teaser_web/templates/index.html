@@ -25,7 +25,10 @@
             <input type="number" name="duration" value="{{ defaults.duration }}" min="5" max="120" />
           </label>
           <label>Language
-            <input name="language" value="{{ defaults.language }}" />
+            <select name="language">
+              <option value="en-US" {% if defaults.language.startswith('en') %}selected{% endif %}>English (en-US)</option>
+              <option value="he-IL" {% if defaults.language.startswith('he') %}selected{% endif %}>Hebrew (he-IL)</option>
+            </select>
           </label>
           <label>Gender
             <select name="gender">
