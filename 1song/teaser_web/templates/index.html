@@ -35,9 +35,39 @@
             </select>
           </label>
         </div>
-        <label>Prompt (alternative to Script)
-          <textarea name="prompt" rows="3" placeholder="Describe your episode">{{ defaults.prompt }}</textarea>
-        </label>
+        <fieldset class="template-group">
+          <legend>Teaser Template Fields</legend>
+          <div class="grid two-col">
+            <label>Song Title
+              <input name="song_title" value="{{ defaults.song_title }}" />
+            </label>
+            <label>Artist
+              <input name="artist" value="{{ defaults.artist }}" />
+            </label>
+            <label>Surprising Insight
+              <textarea name="surprising_insight" rows="2">{{ defaults.surprising_insight }}</textarea>
+            </label>
+            <label>Emotional Angle
+              <textarea name="emotional_angle" rows="2">{{ defaults.emotional_angle }}</textarea>
+            </label>
+            <label>Curiosity Hook Question
+              <textarea name="curiosity_hook" rows="2">{{ defaults.curiosity_hook }}</textarea>
+            </label>
+            <label>Tone
+              <input name="tone_field" value="{{ defaults.tone_field }}" />
+            </label>
+            <label>Audience
+              <textarea name="audience_field" rows="2">{{ defaults.audience_field }}</textarea>
+            </label>
+            <label>Output Style
+              <input name="output_desc" value="{{ defaults.output_desc }}" />
+            </label>
+          </div>
+          <details>
+            <summary>Show Raw XML Prompt</summary>
+            <textarea name="prompt" rows="12" class="mono" id="rawPrompt">{{ defaults.prompt }}</textarea>
+          </details>
+        </fieldset>
         <label>Script (alternative to Prompt)
           <textarea name="script" rows="6" placeholder="Paste episode script here"></textarea>
         </label>
@@ -71,9 +101,25 @@
     const videoLink = document.getElementById('videoLink');
     const finalLink = document.getElementById('finalLink');
 
+    function buildXmlPrompt(fd){
+      const xml = `\n<TeaserTemplate>\n  <Episode>\n    <SongTitle>${fd.get('song_title')||''}</SongTitle>\n    <Artist>${fd.get('artist')||''}</Artist>\n  </Episode>\n\n  <Content>\n    <SurprisingInsight>\n      ${fd.get('surprising_insight')||''}\n    </SurprisingInsight>\n\n    <EmotionalAngle>\n      ${fd.get('emotional_angle')||''}\n    </EmotionalAngle>\n\n    <CuriosityHook>\n      ${fd.get('curiosity_hook')||''}\n    </CuriosityHook>\n  </Content>\n\n  <Tone>\n    ${fd.get('tone_field')||''}\n  </Tone>\n\n  <Audience>\n    ${fd.get('audience_field')||''}\n  </Audience>\n\n  <Output>\n    ${fd.get('output_desc')||''}\n  </Output>\n</TeaserTemplate>`;
+      return xml.trim();
+    }
+
     function formData(mode){
       const fd = new FormData(form);
-      return Object.fromEntries([...fd.entries(), ['mode', mode]]);
+      // Rebuild prompt from structured fields unless user manually edited rawPrompt after expanding
+      const raw = document.getElementById('rawPrompt');
+      const userEdited = raw && raw.dataset.edited === 'true';
+      const prompt = userEdited ? raw.value : buildXmlPrompt(fd);
+      if(raw && !userEdited){ raw.value = prompt; }
+      const entries = [...fd.entries()].filter(([k]) => !['surprising_insight','emotional_angle','curiosity_hook','song_title','artist','tone_field','audience_field','output_desc'].includes(k));
+      return Object.fromEntries([...entries, ['prompt', prompt], ['mode', mode]]);
+    }
+
+    const rawPrompt = document.getElementById('rawPrompt');
+    if(rawPrompt){
+      rawPrompt.addEventListener('input', () => { rawPrompt.dataset.edited = 'true'; });
     }
 
     async function trigger(mode){

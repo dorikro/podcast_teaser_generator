@@ -32,13 +32,45 @@ async def index(request: Request):
             "defaults": {
                 "title": "Demo Episode",
                 "prompt": (
-                    "Create a punchy 15s teaser for a podcast episode where we decode the hidden meaning behind a beloved song. "
-                    "Include: 1 surprising lyric insight, 1 emotional angle listeners usually miss, and end with a curiosity hook question. "
-                    "Tone: curious, energetic, inviting. Audience: music fans 18–35 who love storytelling in music."
+                    "<TeaserTemplate>\n"
+                    "  <Episode>\n"
+                    "    <SongTitle>{SONG_TITLE}</SongTitle>\n"
+                    "    <Artist>{ARTIST}</Artist>\n"
+                    "  </Episode>\n\n"
+                    "  <Content>\n"
+                    "    <SurprisingInsight>\n"
+                    "      {SURPRISING_LYRIC_INSIGHT}\n"
+                    "    </SurprisingInsight>\n\n"
+                    "    <EmotionalAngle>\n"
+                    "      {EMOTIONAL_ANGLE}\n"
+                    "    </EmotionalAngle>\n\n"
+                    "    <CuriosityHook>\n"
+                    "      {HOOK_QUESTION}\n"
+                    "    </CuriosityHook>\n"
+                    "  </Content>\n\n"
+                    "  <Tone>\n"
+                    "    curious, energetic, inviting\n"
+                    "  </Tone>\n\n"
+                    "  <Audience>\n"
+                    "    music fans 18–35 who love storytelling in music\n"
+                    "  </Audience>\n\n"
+                    "  <Output>\n"
+                    "    15s punchy spoken teaser\n"
+                    "  </Output>\n"
+                    "</TeaserTemplate>"
                 ),
                 "headline": "Catchy Headline Here",
                 "duration": 15,
                 "voice_name": settings.azure_speech_voice or "en-US-JennyNeural",
+                # Structured template defaults
+                "song_title": "Fix You",
+                "artist": "Coldplay",
+                "surprising_insight": "The 'lights will guide you home' line was originally a placeholder lyric that became the emotional core.",
+                "emotional_angle": "A quiet promise of support during private grief rather than a generic stadium anthem.",
+                "curiosity_hook": "What secret moment in Chris's life shaped that soaring final build?",
+                "tone_field": "curious, energetic, inviting",
+                "audience_field": "music fans 18–35 who love storytelling in music",
+                "output_desc": "15s punchy spoken teaser",
             },
         },
     )
