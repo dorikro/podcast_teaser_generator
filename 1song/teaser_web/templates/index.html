@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Podcast Teaser Generator</title>
+  <link rel="stylesheet" href="/static/style.css" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+</head>
+<body>
+  <header>
+    <h1>Podcast Teaser Generator</h1>
+    <p class="tagline">Create short, catchy teaser media from your script or prompt.</p>
+  </header>
+  <main>
+    <section class="panel">
+      <form id="genForm">
+        <div class="grid">
+          <label>Title
+            <input name="title" value="{{ defaults.title }}" required />
+          </label>
+          <label>Headline
+            <input name="headline" value="{{ defaults.headline }}" />
+          </label>
+          <label>Duration (s)
+            <input type="number" name="duration" value="{{ defaults.duration }}" min="5" max="120" />
+          </label>
+          <label>Language
+            <input name="language" value="{{ defaults.language }}" />
+          </label>
+          <label>Gender
+            <select name="gender">
+              <option value="auto" {% if defaults.gender=='auto' %}selected{% endif %}>Auto</option>
+              <option value="female">Female</option>
+              <option value="male">Male</option>
+            </select>
+          </label>
+          <label>Voice Name
+            <input name="voice_name" placeholder="Optional explicit voice" />
+          </label>
+        </div>
+        <label>Prompt (alternative to Script)
+          <textarea name="prompt" rows="3" placeholder="Describe your episode">{{ defaults.prompt }}</textarea>
+        </label>
+        <label>Script (alternative to Prompt)
+          <textarea name="script" rows="6" placeholder="Paste episode script here"></textarea>
+        </label>
+        <div class="actions">
+          <button type="button" data-mode="audio" class="primary">Generate Audio Only</button>
+          <button type="button" data-mode="full" class="secondary">Generate Audio + Video</button>
+        </div>
+      </form>
+    </section>
+    <section class="panel" id="results" hidden>
+      <h2>Result</h2>
+      <div id="status" class="status">Working...</div>
+      <div class="outputs" hidden>
+        <p><strong>Project ID:</strong> <span id="pid"></span></p>
+        <p><strong>Audio:</strong> <a id="audioLink" target="_blank">Open</a></p>
+        <p><strong>Video:</strong> <a id="videoLink" target="_blank">Open</a></p>
+        <p><strong>Final:</strong> <a id="finalLink" target="_blank">Open</a></p>
+      </div>
+    </section>
+  </main>
+  <footer>
+    <p>CLI still available: <code>podcast-teaser ...</code></p>
+  </footer>
+  <script>
+    const form = document.getElementById('genForm');
+    const resultSection = document.getElementById('results');
+    const statusEl = document.getElementById('status');
+    const outputs = document.querySelector('.outputs');
+    const pidEl = document.getElementById('pid');
+    const audioLink = document.getElementById('audioLink');
+    const videoLink = document.getElementById('videoLink');
+    const finalLink = document.getElementById('finalLink');
+
+    function formData(mode){
+      const fd = new FormData(form);
+      return Object.fromEntries([...fd.entries(), ['mode', mode]]);
+    }
+
+    async function trigger(mode){
+      resultSection.hidden = false;
+      outputs.hidden = true;
+      statusEl.textContent = 'Submitting...';
+      const payload = formData(mode);
+      // Clear mutually exclusive prompt/script if both filled
+      if(payload.prompt && payload.script){
+        // prefer script if both present
+        payload.prompt = '';
+      }
+      const res = await fetch('/api/generate', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
+      const data = await res.json();
+      if(data.project_id){
+        statusEl.textContent = 'Completed';
+        outputs.hidden = false;
+        pidEl.textContent = data.project_id;
+        audioLink.href = '/' + data.audio_path;
+        if(data.video_path) videoLink.href = '/' + data.video_path; else videoLink.removeAttribute('href');
+        if(data.final_path) finalLink.href = '/' + data.final_path; else finalLink.removeAttribute('href');
+      } else {
+        statusEl.textContent = 'Error generating';
+      }
+    }
+
+    document.querySelectorAll('button[data-mode]').forEach(btn => {
+      btn.addEventListener('click', () => trigger(btn.dataset.mode));
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,66 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "podcast-teaser-generator"
+version = "0.1.0"
+description = "AI-powered agentic flow application for generating social media teasers from podcast scripts"
+authors = [{name = "Your Name", email = "your.email@example.com"}]
+license = {text = "MIT"}
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "openai>=1.30.0",
+    "requests>=2.31.0",
+    "python-dotenv>=1.0.0",
+    "pydantic>=2.5.0",
+    "pydantic-settings>=2.0.0",
+    "mcp>=1.0.0",
+    "elevenlabs>=0.2.26",
+    "pydub>=0.25.1",
+    "moviepy>=1.0.3",
+    "langchain>=0.1.0",
+    "langchain-openai>=0.1.0",
+    "click>=8.1.0",
+    "rich>=13.7.0",
+    "loguru>=0.7.0",
+    # Web UI optional deps grouped separately; core stays minimal
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.24.0",
+    "black>=23.0.0",
+    "isort>=5.12.0",
+    "mypy>=1.5.0",
+]
+
+web = [
+    "fastapi>=0.110.0",
+    "uvicorn[standard]>=0.27.0",
+    "jinja2>=3.1.0",
+    "python-multipart>=0.0.9"
+]
+
+[project.scripts]
+podcast-teaser = "podcast_teaser_generator.cli:main"
+podcast-teaser-web = "teaser_web.app:run"
+
+[tool.setuptools]
+packages = ["podcast_teaser_generator"]
+
+[tool.black]
+line-length = 88
+target-version = ['py39']
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
