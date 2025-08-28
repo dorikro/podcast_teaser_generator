@@ -11,6 +11,26 @@ from podcast_teaser_generator.config import settings
 templates = Jinja2Templates(directory="teaser_web/templates")
 router = APIRouter()
 
+# In-memory task registry (ephemeral; acceptable for single-instance dev use)
+background_tasks: dict[str, asyncio.Task] = {}
+
+def _fs_to_web_path(path: str | None) -> str | None:
+    """Convert absolute filesystem path under output_dir into web path served at /output.
+    Returns None if path is None or outside output_dir.
+    """
+    if not path:
+        return None
+    try:
+        import os
+        root = os.path.abspath(settings.output_dir)
+        ap = os.path.abspath(path)
+        if not ap.startswith(root):
+            return None
+        rel = os.path.relpath(ap, root)
+        return f"/output/{rel}".replace('//', '/')
+    except Exception:
+        return None
+
 class GenerationRequest(BaseModel):
     title: str
     prompt: str | None = None
@@ -77,6 +97,8 @@ async def index(request: Request):
 
 @router.post("/api/generate", response_class=JSONResponse)
 async def api_generate(data: GenerationRequest):
+    """Kick off generation. For mode=full, video + compose happen in background so the
+    HTTP response returns promptly (prevents long-poll hang). Frontend should poll /api/status."""
     workflow = TeaserGenerationWorkflow()
 
     # Derive language & gender from voice_name (single dropdown parameter)
@@ -116,16 +138,94 @@ async def api_generate(data: GenerationRequest):
         force=False,
     )
     _, audio_path = await workflow.step_tts(script_model, language=language, force=False)
+    audio_url = _fs_to_web_path(audio_path)
 
-    video_path = None
-    final_path = None
-    if data.mode == "full":
-        _, video_path = await workflow.step_video(script_model, force=False)
-        _, final_path = await workflow.step_compose(script_model, language=language, force=False)
+    # If only audio requested, return immediately.
+    if data.mode == "audio":
+        return {
+            "project_id": pid,
+            "audio_path": audio_path,  # legacy absolute
+            "audio_url": audio_url,
+            "video_path": None,
+            "video_url": None,
+            "final_path": None,
+            "final_url": None,
+            "status": "audio_ready",
+        }
+
+    # For full mode, schedule video + compose in background if not already done
+    async def run_video_and_compose():
+        try:
+            await workflow.step_video(script_model, force=False)
+            await workflow.step_compose(script_model, language=language, force=False)
+        except Exception as e:
+            # Log; status endpoint will reflect presence/absence of files
+            from loguru import logger as _log
+            _log.error(f"Background video/compose failed for {pid}: {e}")
+
+    if pid not in background_tasks or background_tasks[pid].done():
+        background_tasks[pid] = asyncio.create_task(run_video_and_compose())
 
     return {
         "project_id": pid,
         "audio_path": audio_path,
+        "audio_url": audio_url,
+        "video_path": None,
+        "video_url": None,
+        "final_path": None,
+        "final_url": None,
+        "status": "processing",
+    }
+
+
+@router.get("/api/status", response_class=JSONResponse)
+async def api_status(project_id: str):
+    """Return generation status and available asset paths for a given project id."""
+    # Reconstruct paths based on hashing logic (same as workflow._stable_id_and_dir)
+    # The provided project_id is already the stable id, so we directly inspect output dir.
+    from pathlib import Path
+    project_dir = Path(settings.output_dir) / project_id
+    audio_target = project_dir / f"audio.{settings.output_audio_format}"
+    video_target = project_dir / f"video.{settings.output_video_format}"
+    final_target = project_dir / f"final.{settings.output_video_format}"
+
+    def present(p: Path, min_size: int = 1):
+        return p.exists() and p.stat().st_size >= min_size
+
+    audio_path = str(audio_target) if present(audio_target, 1) else None
+    video_path = str(video_target) if present(video_target, 1024) else None
+    final_path = str(final_target) if present(final_target, 1024) else None
+    audio_url = _fs_to_web_path(audio_path)
+    video_url = _fs_to_web_path(video_path)
+    final_url = _fs_to_web_path(final_path)
+
+    task = background_tasks.get(project_id)
+    task_state = None
+    if task:
+        if task.cancelled():
+            task_state = "cancelled"
+        elif task.done():
+            task_state = "done"
+        else:
+            task_state = "running"
+
+    if final_path:
+        status = "completed"
+    elif video_path:
+        status = "video_ready"
+    elif audio_path:
+        status = "audio_ready"
+    else:
+        status = "pending"
+
+    return {
+        "project_id": project_id,
+        "status": status,
+        "task_state": task_state,
+        "audio_path": audio_path,
         "video_path": video_path,
         "final_path": final_path,
+        "audio_url": audio_url,
+        "video_url": video_url,
+        "final_url": final_url,
     }

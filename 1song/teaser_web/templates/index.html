@@ -81,9 +81,21 @@
       <div id="status" class="status">Working...</div>
       <div class="outputs" hidden>
         <p><strong>Project ID:</strong> <span id="pid"></span></p>
-        <p><strong>Audio:</strong> <a id="audioLink" target="_blank">Open</a></p>
-        <p><strong>Video:</strong> <a id="videoLink" target="_blank">Open</a></p>
-        <p><strong>Final:</strong> <a id="finalLink" target="_blank">Open</a></p>
+        <div class="media-block">
+          <h3>Audio</h3>
+          <audio id="audioPlayer" controls preload="metadata"></audio>
+          <p><a id="audioLink" target="_blank">Open file</a></p>
+        </div>
+        <div class="media-block" id="videoBlock" hidden>
+          <h3>Video (Raw)</h3>
+          <video id="videoPlayer" controls playsinline preload="metadata" style="max-width:280px; width:100%; aspect-ratio:9/16; background:#000"></video>
+          <p><a id="videoLink" target="_blank">Open file</a></p>
+        </div>
+        <div class="media-block" id="finalBlock" hidden>
+          <h3>Final Composited</h3>
+            <video id="finalPlayer" controls playsinline preload="metadata" style="max-width:280px; width:100%; aspect-ratio:9/16; background:#000"></video>
+            <p><a id="finalLink" target="_blank">Open file</a></p>
+        </div>
       </div>
     </section>
   </main>
@@ -96,9 +108,14 @@
     const statusEl = document.getElementById('status');
     const outputs = document.querySelector('.outputs');
     const pidEl = document.getElementById('pid');
-    const audioLink = document.getElementById('audioLink');
-    const videoLink = document.getElementById('videoLink');
-    const finalLink = document.getElementById('finalLink');
+  const audioLink = document.getElementById('audioLink');
+  const videoLink = document.getElementById('videoLink');
+  const finalLink = document.getElementById('finalLink');
+  const audioPlayer = document.getElementById('audioPlayer');
+  const videoPlayer = document.getElementById('videoPlayer');
+  const finalPlayer = document.getElementById('finalPlayer');
+  const videoBlock = document.getElementById('videoBlock');
+  const finalBlock = document.getElementById('finalBlock');
 
     function buildXmlPrompt(fd){
       const duration = fd.get('duration') || '15';
@@ -144,16 +161,65 @@
       }
       const res = await fetch('/api/generate', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
       const data = await res.json();
-      if(data.project_id){
-        statusEl.textContent = 'Completed';
-        outputs.hidden = false;
-        pidEl.textContent = data.project_id;
-        audioLink.href = '/' + data.audio_path;
-        if(data.video_path) videoLink.href = '/' + data.video_path; else videoLink.removeAttribute('href');
-        if(data.final_path) finalLink.href = '/' + data.final_path; else finalLink.removeAttribute('href');
-      } else {
+      if(!data.project_id){
         statusEl.textContent = 'Error generating';
+        return;
       }
+      pidEl.textContent = data.project_id;
+      const projectId = data.project_id;
+      // Always set audio if present
+      if(data.audio_url){
+        const bust = data.audio_url + '?v=' + Date.now();
+        audioLink.href = bust;
+        audioPlayer.src = bust;
+      } else if(data.audio_path){
+        const legacy = '/' + data.audio_path;
+        audioLink.href = legacy;
+        audioPlayer.src = legacy;
+      }
+      outputs.hidden = false;
+      if(mode === 'audio'){
+        statusEl.textContent = 'Audio ready';
+        return;
+      }
+      statusEl.textContent = 'Processing video...';
+      // Poll status endpoint
+      const poll = async () => {
+        try {
+          const r = await fetch(`/api/status?project_id=${projectId}`);
+          const s = await r.json();
+          if(s.audio_url){
+            const bustA = s.audio_url + '?v=' + Date.now();
+            audioLink.href = bustA; audioPlayer.src = audioPlayer.src || bustA;
+          }
+          if(s.video_url){
+            const bustV = s.video_url + '?v=' + Date.now();
+            videoLink.href = bustV;
+            if(!videoPlayer.src) videoPlayer.src = bustV;
+            videoBlock.hidden = false;
+          }
+          if(s.final_url){
+            const bustF = s.final_url + '?v=' + Date.now();
+            finalLink.href = bustF;
+            if(!finalPlayer.src) finalPlayer.src = bustF;
+            finalBlock.hidden = false;
+          }
+          if(s.status === 'completed'){
+            statusEl.textContent = 'Completed';
+            return; // stop polling
+          } else if(s.status === 'video_ready') {
+            statusEl.textContent = 'Video ready, composing...';
+          } else if(s.status === 'audio_ready') {
+            statusEl.textContent = 'Audio ready, generating video...';
+          } else {
+            statusEl.textContent = 'Processing...';
+          }
+        } catch(e){
+          statusEl.textContent = 'Polling error; retrying...';
+        }
+        setTimeout(poll, 3000);
+      };
+      poll();
     }
 
     document.querySelectorAll('button[data-mode]').forEach(btn => {
